@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/dimfu/kaido/config"
 	"github.com/dimfu/kaido/models"
@@ -65,9 +66,11 @@ func getLeaderboardTracks() (*map[string]models.Leaderboard, error) {
 						continue
 					}
 
+					region := strings.ToLower(elem.Text)
+
 					if _, exists := u.Query()["leaderboard"]; exists {
-						leaderboard[elem.Text] = models.Leaderboard{
-							Region: elem.Text,
+						leaderboard[region] = models.Leaderboard{
+							Region: region,
 							Url:    u.String(),
 						}
 					}

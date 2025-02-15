@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/dimfu/kaido/collectors"
+	"github.com/dimfu/kaido/config"
 	"github.com/dimfu/kaido/store"
 	"github.com/urfave/cli/v3"
 )
@@ -24,6 +26,7 @@ func init() {
 }
 
 func main() {
+	cfg := config.GetConfig()
 	store, err := store.GetInstance()
 	if err != nil {
 		log.Fatal(err)
@@ -38,8 +41,35 @@ func main() {
 				Name:    "run",
 				Aliases: []string{"r"},
 				Usage:   "collect all or some map records",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "leaderboard",
+						Value: "all",
+						Usage: "get specific leaderboards eg;kaido run ., default to all",
+					},
+					// TODO: add optional flag for showing only current month records
+				},
 				Action: func(ctx context.Context, c *cli.Command) error {
-					fmt.Println("recoooooooooords")
+					leaderboardFlag := c.String("leaderboard")
+					if len(leaderboardFlag) > 0 {
+						// TODO: handle multiple regions input
+						lbToLower := strings.ToLower(leaderboardFlag)
+						_, exists := cfg.Leaderboards[lbToLower]
+						if !exists {
+							fmt.Println("cannot find leaderboard")
+						}
+						// fetch the result of current leaderboard
+					}
+					return nil
+				},
+			},
+			{
+				Name:  "leaderboards",
+				Usage: "See all available leaderboards",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					for region := range cfg.Leaderboards {
+						fmt.Println(region)
+					}
 					return nil
 				},
 			},
