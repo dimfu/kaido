@@ -1,40 +1,45 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
-	"path"
-	"time"
 
-	bolt "go.etcd.io/bbolt"
+	"github.com/dimfu/kaido/store"
+	"github.com/urfave/cli/v3"
 )
 
 func init() {
-	dir, err := os.UserHomeDir()
-	if err != nil {
+	if err := setup(); err != nil {
 		log.Fatal(err)
-	}
-	storePath := path.Join(dir, ".kaido")
-	_, err = os.Stat(storePath)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(storePath, os.ModePerm); err != nil {
-			log.Fatal(err)
-		}
 	}
 }
 
 func main() {
-	homeDir, err := os.UserHomeDir()
+	store, err := store.GetInstance()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbDir := fmt.Sprintf("%s/.kaido/store.db", homeDir)
-	db, err := bolt.Open(dbDir, 0600, &bolt.Options{
-		Timeout: 1 * time.Second,
-	})
-	if err != nil {
+	defer store.Close()
+
+	cmd := &cli.Command{
+		Name:  "kaido",
+		Usage: "Collect kaido battle tour time records",
+		Commands: []*cli.Command{
+			{
+				Name:    "run",
+				Aliases: []string{"r"},
+				Usage:   "collect all or some map records",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					fmt.Println("this ran")
+					return nil
+				},
+			},
+		},
+	}
+
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
 }

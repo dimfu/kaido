@@ -23,7 +23,7 @@ func TestOpenStore(t *testing.T) {
 	}
 
 	storePath := path.Join(outDir, "kaido.store")
-	store, err := Open(storePath)
+	store, err := open(storePath)
 	if err != nil {
 		t.Fatalf("error while initializing store file: %v\n", err)
 	}
@@ -38,7 +38,7 @@ func TestWrite(t *testing.T) {
 	parentDir := filepath.Dir(dir)
 	outDir := path.Join(parentDir, "/.out")
 	storePath := path.Join(outDir, "kaido.store")
-	store, err := Open(storePath)
+	store, err := open(storePath)
 	if err != nil {
 		t.Fatalf("error while initializing store file: %v\n", err)
 	}

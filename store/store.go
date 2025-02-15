@@ -25,7 +25,34 @@ type Store struct {
 	file    *os.File
 }
 
-func Open(path string) (*Store, error) {
+var (
+	mu       = sync.Mutex{}
+	instance *Store
+	once     sync.Once
+)
+
+func GetInstance() (*Store, error) {
+	if instance == nil {
+		mu.Lock()
+		defer mu.Unlock()
+		// more if check for instance to ensure no more than 1 goroutine bypass the first check
+		if instance == nil {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return nil, err
+			}
+			dbDir := fmt.Sprintf("%s/.kaido/store.db", homeDir)
+			store, err := open(dbDir)
+			if err != nil {
+				return nil, err
+			}
+			instance = store
+		}
+	}
+	return instance, nil
+}
+
+func open(path string) (*Store, error) {
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("error while open file: %v\n", err)
