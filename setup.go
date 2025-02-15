@@ -23,15 +23,10 @@ func createWorkDir() (string, error) {
 	return wPath, nil
 }
 
-func setup() error {
+func createCfgFile(workDir string) error {
 	cfg := config.GetConfig()
-	workDir, err := createWorkDir()
-	if err != nil {
-		return err
-	}
-
 	cfgPath := path.Join(workDir, "config.json")
-	_, err = os.Stat(cfgPath)
+	_, err := os.Stat(cfgPath)
 
 	if os.IsNotExist(err) {
 		file, err := os.Create(cfgPath)
@@ -40,6 +35,7 @@ func setup() error {
 		}
 		defer file.Close()
 
+		cfg.KBTBaseUrl = "http://5.161.130.32:8000"
 		cfg.WorkspacePath = workDir
 
 		bytes, err := json.MarshalIndent(cfg, "", "\t")
@@ -64,5 +60,18 @@ func setup() error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func setup() error {
+	workDir, err := createWorkDir()
+	if err != nil {
+		return err
+	}
+	if err := createCfgFile(workDir); err != nil {
+		return err
+	}
+
 	return nil
 }
