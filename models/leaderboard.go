@@ -1,9 +1,13 @@
 package models
 
 type Track struct {
-	Name   string   `json:"name"`
-	Stages []string `json:"stages"`
-	Url    string   `json:"url"`
+	Name   string  `json:"name"`
+	Stages []Stage `json:"stages"`
+}
+
+type Stage struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
 }
 
 type Leaderboard struct {

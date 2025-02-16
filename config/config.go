@@ -28,9 +28,15 @@ func GetConfig() *Config {
 }
 
 func (c *Config) Save() error {
-	data, err := json.MarshalIndent(c, "", "  ")
+	file, err := os.Create(path.Join(c.WorkspacePath, "config.json"))
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path.Join(c.WorkspacePath, "config.json"), data, 0644)
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+
+	return encoder.Encode(c)
 }
