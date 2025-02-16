@@ -18,7 +18,7 @@ func init() {
 	if err := setup(); err != nil {
 		log.Fatalf("failed to initiate setup: %v", err)
 	}
-	if err := collectors.GenerateLeaderboardTracks(); err != nil {
+	if err := collectors.GenerateTimingLeaderboards(); err != nil {
 		if !errors.Is(err, collectors.ERR_ALREADY_GENERATED) {
 			log.Fatalf("cannot get leaderboard tracks data: %v", err)
 		}

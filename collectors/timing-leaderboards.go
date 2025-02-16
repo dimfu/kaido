@@ -16,14 +16,14 @@ var (
 	ERR_ALREADY_GENERATED = errors.New("leaderboard tracks already generated")
 )
 
-func GenerateLeaderboardTracks() error {
+func GenerateTimingLeaderboards() error {
 	cfg := config.GetConfig()
 
 	if cfg.Leaderboards != nil {
 		return ERR_ALREADY_GENERATED
 	}
 
-	leaderboards, err := getLeaderboards()
+	leaderboards, err := getLeaderboardsName()
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func GenerateLeaderboardTracks() error {
 	return nil
 }
 
-func getLeaderboards() (*map[string]models.Leaderboard, error) {
+func getLeaderboardsName() (*map[string]models.Leaderboard, error) {
 	cfg := config.GetConfig()
 	leaderboard := make(map[string]models.Leaderboard)
 	c := colly.NewCollector()
