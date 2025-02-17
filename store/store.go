@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -75,7 +76,11 @@ func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.file != nil {
-		s.file.Close()
+		defer s.file.Close()
+		err := s.compact()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 	return nil
 }
@@ -97,17 +102,6 @@ func (s *Store) Put(r Record) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	size := HEADER_SIZE + len(r.Key) + len(r.Value)
-	buf := make([]byte, size)
-
-	// serialize the header for this record
-	binary.LittleEndian.PutUint32(buf[0:4], r.Timestamp)
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(r.Key)))
-	binary.LittleEndian.PutUint32(buf[8:12], uint32(len(r.Value)))
-
-	copy(buf[HEADER_SIZE:HEADER_SIZE+len(r.Key)], r.Key)
-	copy(buf[HEADER_SIZE+len(r.Key):], r.Value)
-
 	// gets the offset of the new record
 	offset, err := s.file.Seek(0, io.SeekEnd)
 	if err != nil {
@@ -115,7 +109,7 @@ func (s *Store) Put(r Record) error {
 	}
 
 	// writes new value at the very end
-	if _, err = s.file.Write(buf); err != nil {
+	if _, err = s.file.Write(recTobuf(r)); err != nil {
 		return err
 	}
 
@@ -140,6 +134,50 @@ func (s *Store) generateIndex() error {
 
 		s.storage[string(rec.Key)] = offset
 		offset += int64(HEADER_SIZE + len(rec.Key) + len(rec.Value))
+	}
+
+	return nil
+}
+
+func (s *Store) compact() error {
+	storePath, err := filepath.Abs(s.file.Name())
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(storePath)
+
+	temp, err := os.CreateTemp(dir, "temp-*.db")
+	if err != nil {
+		return err
+	}
+	defer temp.Close()
+
+	_, err = temp.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+
+	// write recent records from store to temp file
+	for key := range s.storage {
+		record, err := s.Get(key)
+		if err != nil {
+			continue
+		}
+
+		if _, err = temp.Write(recTobuf(*record)); err != nil {
+			return err
+		}
+	}
+
+	err = os.Remove(storePath)
+	if err != nil {
+		return err
+	}
+
+	err = os.Rename(temp.Name(), s.file.Name())
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -179,4 +217,18 @@ func (s *Store) deserialize(offset int64) (*Record, error) {
 	record.Value = value
 
 	return record, nil
+}
+
+func recTobuf(r Record) []byte {
+	size := HEADER_SIZE + len(r.Key) + len(r.Value)
+	buf := make([]byte, size)
+
+	// serialize the header for this record
+	binary.LittleEndian.PutUint32(buf[0:4], r.Timestamp)
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(len(r.Key)))
+	binary.LittleEndian.PutUint32(buf[8:12], uint32(len(r.Value)))
+
+	copy(buf[HEADER_SIZE:HEADER_SIZE+len(r.Key)], r.Key)
+	copy(buf[HEADER_SIZE+len(r.Key):], r.Value)
+	return buf
 }
