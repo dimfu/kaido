@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/dimfu/kaido/collectors"
 	"github.com/dimfu/kaido/config"
@@ -49,19 +48,7 @@ func main() {
 					},
 					// TODO: add optional flag for showing only current month records
 				},
-				Action: func(ctx context.Context, c *cli.Command) error {
-					leaderboardFlag := c.String("leaderboard")
-					if len(leaderboardFlag) > 0 {
-						// TODO: handle multiple regions input
-						lbToLower := strings.ToLower(leaderboardFlag)
-						_, exists := cfg.Leaderboards[lbToLower]
-						if !exists {
-							fmt.Println("cannot find leaderboard")
-						}
-						// fetch the result of current leaderboard
-					}
-					return nil
-				},
+				Action: collectLeaderboardRecords,
 			},
 			{
 				Name:  "leaderboards",

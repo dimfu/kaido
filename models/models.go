@@ -17,3 +17,16 @@ type Leaderboard struct {
 }
 
 type Leaderboards = map[string]Leaderboard
+
+type TimingLeaderboard struct {
+	Leaderboard Leaderboard `json:"leaderboard"`
+	Records     []Record    `json:"records"`
+}
+
+type Record struct {
+	Rank    int    `json:"rank"`
+	Date    string `json:"date"`
+	Player  string `json:"player"`
+	CarName string `json:"carName"`
+	Time    string `json:"time"`
+}
