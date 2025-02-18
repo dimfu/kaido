@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
+	"log"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/dimfu/kaido/collectors"
 	"github.com/dimfu/kaido/config"
@@ -19,46 +16,31 @@ func collectLeaderboardRecords(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	cfg := config.GetConfig()
+
 	leaderboardFlag := c.String("leaderboard")
-	if len(leaderboardFlag) > 0 {
-		// TODO: handle multiple regions input
-		lbToLower := strings.ToLower(leaderboardFlag)
-		leaderboard, exists := cfg.Leaderboards[lbToLower]
-		if !exists {
-			fmt.Println("cannot find leaderboard")
-		}
+	leaderboard := strings.ToLower(leaderboardFlag)
 
-		var wg sync.WaitGroup
-		for _, track := range leaderboard.Tracks {
-			for _, stage := range track.Stages {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					records, err := collectors.ExtractTimingTable(track.Name, stage)
-					if err != nil {
-						return
-					}
-
-					jsonRecords, err := json.Marshal(records)
-					if err != nil {
-						fmt.Println("error while marshaling json", err)
-						return
-					}
-
-					err = s.Put(store.Record{
-						Timestamp: uint32(time.Now().Unix()),
-						Key:       []byte(stage.Name),
-						Value:     jsonRecords,
-					})
-					if err != nil {
-						return
-					}
-				}()
-			}
-
-		}
-		wg.Wait()
+	// TODO: handle all region at once
+	if leaderboard == "all" {
+		// get all leaderboard record from all region
+		return nil
 	}
+
+	timing := collectors.TimingTable{
+		Store: s,
+		Cfg:   config.GetConfig(),
+	}
+
+	// TODO: handle multiple regions input
+	results, err := timing.Extract(leaderboard)
+	if err != nil {
+		return err
+	}
+
+	// TODO: compare previous and current top time
+	for key, result := range results {
+		log.Println(key, result.Prev, result.Curr)
+	}
+
 	return nil
 }
