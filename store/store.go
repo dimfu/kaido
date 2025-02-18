@@ -14,6 +14,10 @@ const (
 	HEADER_SIZE = 12 // Timestamp = 4 bytes, Key = 4 bytes, Value = 4 bytes
 )
 
+var (
+	ERR_KEY_NOT_FOUND = errors.New("could not find record with this key")
+)
+
 type Record struct {
 	Timestamp uint32
 	Key       []byte
@@ -77,25 +81,25 @@ func (s *Store) Close() error {
 	defer s.mu.Unlock()
 	if s.file != nil {
 		defer s.file.Close()
-		err := s.compact()
-		if err != nil {
-			fmt.Println(err)
-		}
+		return s.compact()
 	}
 	return nil
 }
 
 func (s *Store) Get(key string) (*Record, error) {
-	offset, exists := s.storage[key]
-	if !exists {
-		return nil, errors.New("could not find record with this key")
+	if len(key) == 0 {
+		return nil, fmt.Errorf("key cannot be empty")
 	}
 
-	rec, err := s.deserialize(offset)
-	if err != nil {
-		return nil, err
+	s.mu.RLock()
+	offset, exists := s.storage[key]
+	s.mu.RUnlock()
+
+	if !exists {
+		return nil, ERR_KEY_NOT_FOUND
 	}
-	return rec, nil
+
+	return s.deserialize(offset)
 }
 
 func (s *Store) Put(r Record) error {
@@ -105,12 +109,12 @@ func (s *Store) Put(r Record) error {
 	// gets the offset of the new record
 	offset, err := s.file.Seek(0, io.SeekEnd)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not set offset: %v", err)
 	}
 
 	// writes new value at the very end
 	if _, err = s.file.Write(recTobuf(r)); err != nil {
-		return err
+		return fmt.Errorf("error while writing new value: %v", err)
 	}
 
 	s.storage[string(r.Key)] = offset
@@ -129,7 +133,7 @@ func (s *Store) generateIndex() error {
 		}
 
 		if err != nil {
-			return err
+			return fmt.Errorf("error while generating index: %v", err)
 		}
 
 		s.storage[string(rec.Key)] = offset
@@ -159,8 +163,8 @@ func (s *Store) compact() error {
 	}
 
 	// write recent records from store to temp file
-	for key := range s.storage {
-		record, err := s.Get(key)
+	for _, offset := range s.storage {
+		record, err := s.deserialize(offset)
 		if err != nil {
 			continue
 		}
@@ -184,38 +188,31 @@ func (s *Store) compact() error {
 }
 
 func (s *Store) deserialize(offset int64) (*Record, error) {
-	if _, err := s.file.Seek(offset, io.SeekStart); err != nil {
-		return nil, err
-	}
-
-	record := &Record{}
 	var timestamp, keyLen, valueLen uint32
+	record := &Record{}
+	buf := make([]byte, HEADER_SIZE)
 
-	if err := binary.Read(s.file, binary.LittleEndian, &timestamp); err != nil {
+	if _, err := s.file.ReadAt(buf, offset); err != nil {
 		return nil, err
 	}
+
+	timestamp = binary.LittleEndian.Uint32(buf[0:4])
+	keyLen = binary.LittleEndian.Uint32(buf[4:8])
+	valueLen = binary.LittleEndian.Uint32(buf[8:12])
+
 	record.Timestamp = timestamp
 
-	if err := binary.Read(s.file, binary.LittleEndian, &keyLen); err != nil {
-		return nil, err
-	}
-
-	if err := binary.Read(s.file, binary.LittleEndian, &valueLen); err != nil {
-		return nil, err
-	}
-
 	key := make([]byte, keyLen)
-	if _, err := s.file.Read(key); err != nil {
+	if _, err := s.file.ReadAt(key, HEADER_SIZE+offset); err != nil {
 		return nil, err
 	}
 	record.Key = key
 
 	value := make([]byte, valueLen)
-	if _, err := s.file.Read(value); err != nil {
+	if _, err := s.file.ReadAt(value, HEADER_SIZE+offset+int64(keyLen)); err != nil {
 		return nil, err
 	}
 	record.Value = value
-
 	return record, nil
 }
 
