@@ -3,6 +3,7 @@ package collectors
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
@@ -14,9 +15,10 @@ import (
 )
 
 type TimingTable struct {
-	Store *store.Store
-	Cfg   *config.Config
-	wg    sync.WaitGroup
+	Store        *store.Store
+	Cfg          *config.Config
+	CurrentMonth bool
+	wg           sync.WaitGroup
 }
 
 type TimingResult struct {
@@ -24,6 +26,15 @@ type TimingResult struct {
 	Curr  *models.Record
 	stage string
 	err   error
+}
+
+func (t *TimingTable) stageKey(stage string) string {
+	if t.CurrentMonth {
+		year, month, _ := time.Now().Date()
+		return fmt.Sprintf("%d-%d_%s", year, month, stage)
+	} else {
+		return stage
+	}
 }
 
 func (t *TimingTable) Extract(l string) (map[string]TimingResult, error) {
@@ -51,7 +62,6 @@ func (t *TimingTable) Extract(l string) (map[string]TimingResult, error) {
 
 	for r := range resChan {
 		if r.err != nil {
-			// TODO: handle errors properly
 			fmt.Println(r.err)
 			continue
 		}
@@ -96,7 +106,7 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 	}
 
 	if prevFirst == (models.Record{}) && currFirst == (models.Record{}) {
-		ch <- TimingResult{err: fmt.Errorf("Both prevFirst and currFirst are empty, skipping...")}
+		ch <- TimingResult{err: fmt.Errorf("Both prevFirst and currFirst for %s are empty, skipping...", stage.Name)}
 		return
 	}
 
@@ -109,7 +119,7 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 
 func (t *TimingTable) prevTimingRecords(stage string) ([]models.Record, error) {
 	var records []models.Record
-	r, err := t.Store.Get(stage)
+	r, err := t.Store.Get(t.stageKey(stage))
 	if err != nil {
 		return records, err
 	}
@@ -126,7 +136,7 @@ func (t *TimingTable) updateTimingRecords(records []models.Record, stage string)
 	}
 	err = t.Store.Put(store.Record{
 		Timestamp: uint32(time.Now().Unix()),
-		Key:       []byte(stage),
+		Key:       []byte(t.stageKey(stage)),
 		Value:     jsonRecords,
 	})
 	if err != nil {
@@ -152,7 +162,20 @@ func (t *TimingTable) getRecords(stage models.Stage) ([]models.Record, error) {
 		})
 	})
 
-	err := c.Visit(stage.Url)
+	u, err := url.Parse(stage.Url)
+	if err != nil {
+		return records, err
+	}
+
+	q := u.Query()
+	month := "0"
+	if t.CurrentMonth {
+		month = "1"
+	}
+	q.Set("month", month)
+	u.RawQuery = q.Encode()
+
+	err = c.Visit(u.String())
 	if err != nil {
 		return records, err
 	}
