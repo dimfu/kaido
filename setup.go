@@ -6,6 +6,7 @@ import (
 	"path"
 
 	"github.com/dimfu/kaido/config"
+	"github.com/dimfu/kaido/discord"
 )
 
 func createWorkDir() (string, error) {
@@ -23,7 +24,7 @@ func createWorkDir() (string, error) {
 	return wPath, nil
 }
 
-func createCfgFile(workDir string) error {
+func createCfgFile(workDir string) (*config.Config, error) {
 	cfg := config.GetConfig()
 	cfgPath := path.Join(workDir, "config.json")
 	_, err := os.Stat(cfgPath)
@@ -31,7 +32,7 @@ func createCfgFile(workDir string) error {
 	if os.IsNotExist(err) {
 		file, err := os.Create(cfgPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer file.Close()
 
@@ -40,28 +41,28 @@ func createCfgFile(workDir string) error {
 
 		bytes, err := json.MarshalIndent(cfg, "", "\t")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		_, err = file.Write(bytes)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else if err != nil {
-		return err
+		return nil, err
 	}
 
 	bytes, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = json.Unmarshal(bytes, cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return cfg, nil
 }
 
 func setup() error {
@@ -69,8 +70,15 @@ func setup() error {
 	if err != nil {
 		return err
 	}
-	if err := createCfgFile(workDir); err != nil {
+	cfg, err := createCfgFile(workDir)
+	if err != nil {
 		return err
+	}
+
+	if len(cfg.DiscordWebhookURL) == 0 {
+		if err := discord.Prompt(); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -97,3 +97,7 @@ func compare(region string, prev, curr models.Record) {
 		fmt.Println(curr.Player, "is the new winner in", region, "by", curr.Time)
 	}
 }
+
+func sendWebhook() {
+
+}

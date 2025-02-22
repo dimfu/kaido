@@ -10,9 +10,10 @@ import (
 )
 
 type Config struct {
-	WorkspacePath string              `json:"workspace_path"`
-	KBTBaseUrl    string              `json:"kbt_base_url"`
-	Leaderboards  models.Leaderboards `json:"leaderboards"`
+	WorkspacePath     string              `json:"workspace_path"`
+	KBTBaseUrl        string              `json:"kbt_base_url"`
+	Leaderboards      models.Leaderboards `json:"leaderboards"`
+	DiscordWebhookURL string              `json:"discord_webhook_url"`
 }
 
 var (
