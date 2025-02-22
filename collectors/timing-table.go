@@ -106,7 +106,7 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 	}
 
 	if prevFirst == (models.Record{}) && currFirst == (models.Record{}) {
-		ch <- TimingResult{err: fmt.Errorf("Both prevFirst and currFirst for %s are empty, skipping...", stage.Name)}
+		ch <- TimingResult{err: fmt.Errorf("Cannot find records in %s, skipping...", stage.Name)}
 		return
 	}
 

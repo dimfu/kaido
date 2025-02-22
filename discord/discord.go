@@ -2,6 +2,8 @@ package discord
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -59,6 +61,31 @@ func Prompt(webhookUrl ...string) error {
 	if err := cfg.Save(); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func Send(s, url string) error {
+	client := &http.Client{}
+	payload := map[string]string{
+		"content": s,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	request.Header.Set("Content-Type", "application/json")
+	if err != nil {
+		return err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
 
 	return nil
 }
