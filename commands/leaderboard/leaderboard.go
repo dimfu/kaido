@@ -18,6 +18,11 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+const (
+	ALL_TIME_STR   = "%s is the new fastest time in %s by %s\n"
+	CURR_MONTH_STR = "%s is the new fastest time this month in %s by %s\n"
+)
+
 var (
 	cfg = config.GetConfig()
 	mu  sync.Mutex
@@ -64,9 +69,6 @@ func Extract(ctx context.Context, c *cli.Command) error {
 		}
 	}
 
-	defer func() {
-	}()
-
 	var wg sync.WaitGroup
 
 	done := make(chan struct{})
@@ -100,6 +102,7 @@ func Extract(ctx context.Context, c *cli.Command) error {
 	select {
 	case <-done:
 		if sb.Len() > 0 {
+			fmt.Println(sb.String())
 			err := discord.Send(sb.String(), cfg.DiscordWebhookURL)
 			if err != nil {
 				fmt.Println(err)
@@ -143,27 +146,50 @@ func toSeconds(time string) (float64, error) {
 	return float64(minutes*60+seconds) + float64(milliseconds)/1000.0, nil
 }
 
-func compare(region string, prev, curr *models.Record, currMonth bool) (string, error) {
-	if len(prev.Time) == 0 {
-		return "", errors.New("skipping comparison, previous record is not yet written in the store")
+func compare(region string, prev, curr []models.Record, currMonth bool) (string, error) {
+	prevFirst, currFirst := getFastestRecord(prev), getFastestRecord(curr)
+
+	if prevFirst == nil && currFirst == nil {
+		return "", fmt.Errorf("Cannot find records in %s, skipping...", region)
 	}
 
-	t1, err := toSeconds(prev.Time)
-	if err != nil {
-		return "", err
-	}
-	t2, err := toSeconds(curr.Time)
-	if err != nil {
-		return "", err
-	}
+	var t1, t2 float64
+	var err error
 
-	if t2 < t1 {
-		if !currMonth { // all time
-			return fmt.Sprintf("%s is the new fastest time in %s by %s\n", curr.Player, region, curr.Time), nil
-		} else {
-			return fmt.Sprintf("%s is the new fastest time this month in %s by %s\n", curr.Player, region, curr.Time), nil
+	if prevFirst != nil {
+		t1, err = toSeconds(prevFirst.Time)
+		if err != nil {
+			return "", err
 		}
 	}
 
+	if currFirst != nil {
+		t2, err = toSeconds(currFirst.Time)
+		if err != nil {
+			return "", err
+		}
+
+		if prevFirst == nil && currMonth {
+			return fmt.Sprintf(CURR_MONTH_STR, currFirst.Player, region, currFirst.Time), nil
+		}
+	} else {
+		return "", fmt.Errorf("Nothing to compare in %s leaderboard", region)
+	}
+
+	if t2 < t1 {
+		msg := ALL_TIME_STR
+		if currMonth {
+			msg = CURR_MONTH_STR
+		}
+		return fmt.Sprintf(msg, currFirst.Player, region, currFirst.Time), nil
+	}
+
 	return "", nil
+}
+
+func getFastestRecord(records []models.Record) *models.Record {
+	if len(records) > 0 && records[0].Rank == 1 {
+		return &records[0]
+	}
+	return nil
 }

@@ -22,8 +22,8 @@ type TimingTable struct {
 }
 
 type TimingResult struct {
-	Prev  *models.Record
-	Curr  *models.Record
+	Prev  []models.Record
+	Curr  []models.Record
 	stage string
 	err   error
 }
@@ -96,24 +96,10 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 		return
 	}
 
-	var prevFirst, currFirst models.Record
-	if len(prev) > 0 && prev[0].Rank == 1 {
-		prevFirst = prev[0]
-	}
-
-	if len(curr) > 0 && curr[0].Rank == 1 {
-		currFirst = curr[0]
-	}
-
-	if prevFirst == (models.Record{}) && currFirst == (models.Record{}) {
-		ch <- TimingResult{err: fmt.Errorf("Cannot find records in %s, skipping...", stage.Name)}
-		return
-	}
-
 	ch <- TimingResult{
 		stage: stage.Name,
-		Prev:  &prevFirst,
-		Curr:  &currFirst,
+		Prev:  prev,
+		Curr:  curr,
 	}
 }
 
