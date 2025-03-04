@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,13 +60,10 @@ func Extract(ctx context.Context, c *cli.Command) error {
 	leaderboards := re.Split(leaderboard, -1)
 
 	// handle if one of the leaderboard item including "all" by adding the whole leaderboard list instead
-	for _, leaderboard := range leaderboards {
-		if leaderboard == "all" {
-			leaderboards = make([]string, 0, len(cfg.Leaderboards))
-			for region := range cfg.Leaderboards {
-				leaderboards = append(leaderboards, region)
-			}
-			break
+	if slices.Contains(leaderboards, "all") {
+		leaderboards = make([]string, 0, len(cfg.Leaderboards))
+		for region := range cfg.Leaderboards {
+			leaderboards = append(leaderboards, region)
 		}
 	}
 
@@ -88,12 +86,12 @@ func Extract(ctx context.Context, c *cli.Command) error {
 			}
 
 			for region, result := range results {
-				currWinnerStr, err := compare(region, result.Prev, result.Curr, currentMonth)
+				currTop, err := compare(region, result.Prev, result.Curr, currentMonth)
 				if err != nil {
 					fmt.Println(err)
 				}
 				mu.Lock()
-				sb.Write([]byte(currWinnerStr))
+				sb.Write([]byte(currTop))
 				mu.Unlock()
 			}
 		}(leaderboard, currentMonth)
@@ -102,11 +100,27 @@ func Extract(ctx context.Context, c *cli.Command) error {
 	select {
 	case <-done:
 		if sb.Len() > 0 {
-			fmt.Println(sb.String())
-			err := discord.Send(sb.String(), cfg.DiscordWebhookURL)
-			if err != nil {
-				fmt.Println(err)
+			players := strings.Split(sb.String(), "\n")
+			batchSize := 10
+
+			var wg sync.WaitGroup
+
+			for i := 0; i < len(players); i += batchSize {
+				wg.Add(1)
+				end := i + batchSize
+				if end > len(players) {
+					end = len(players)
+				}
+				go func(ps []string) {
+					defer wg.Done()
+					toStr := strings.Join(ps, "\n")
+					err := discord.Send(toStr, cfg.DiscordWebhookURL)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}(players[i:end])
 			}
+			wg.Wait()
 		}
 
 		fmt.Printf("Success collecting records from %d leaderboards (took %s)\n", len(leaderboards), time.Since(start))
@@ -169,6 +183,7 @@ func compare(region string, prev, curr []models.Record, currMonth bool) (string,
 			return "", err
 		}
 
+		// handle current month winner if there is no prev record
 		if prevFirst == nil && currMonth {
 			return fmt.Sprintf(CURR_MONTH_STR, currFirst.Player, region, currFirst.Time), nil
 		}
