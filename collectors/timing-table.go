@@ -28,31 +28,35 @@ type TimingResult struct {
 	err   error
 }
 
-func (t *TimingTable) stageKey(stage string) string {
+func (t *TimingTable) stageKey(trackName, stage string) string {
 	if t.CurrentMonth {
 		year, month, _ := time.Now().Date()
-		return fmt.Sprintf("%d-%d_%s", year, month, stage)
+		return fmt.Sprintf("%d-%d_%s-%s", year, month, trackName, stage)
 	} else {
 		return stage
 	}
 }
 
 func (t *TimingTable) Extract(l string) (map[string]TimingResult, error) {
-	var stages []models.Stage
+	tracks := make(map[string][]models.Stage)
 	result := make(map[string]TimingResult)
 	leaderboard, exists := t.Cfg.Leaderboards[l]
 	if !exists {
 		return nil, fmt.Errorf("cannot find leaderboard: %s", l)
 	}
 
+	var stages int
 	for _, track := range leaderboard.Tracks {
-		stages = append(stages, track.Stages...)
+		tracks[track.Name] = append(tracks[track.Name], track.Stages...)
+		stages += len(track.Stages)
 	}
 
-	resChan := make(chan TimingResult, len(stages))
-	t.wg.Add(len(stages))
-	for _, stage := range stages {
-		go t.processRecords(stage, resChan)
+	resChan := make(chan TimingResult, stages)
+	t.wg.Add(stages)
+	for trackName, stages := range tracks {
+		for _, stage := range stages {
+			go t.processRecords(trackName, stage, resChan)
+		}
 	}
 
 	go func() {
@@ -74,10 +78,10 @@ func (t *TimingTable) Extract(l string) (map[string]TimingResult, error) {
 	return result, nil
 }
 
-func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult) {
+func (t *TimingTable) processRecords(trackName string, stage models.Stage, ch chan<- TimingResult) {
 	defer t.wg.Done()
 
-	prev, err := t.prevTimingRecords(stage.Name)
+	prev, err := t.prevTimingRecords(trackName, stage.Name)
 	if err != nil {
 		if err != store.ERR_KEY_NOT_FOUND {
 			ch <- TimingResult{err: err}
@@ -91,7 +95,7 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 		return
 	}
 
-	if err := t.updateTimingRecords(curr, stage.Name); err != nil {
+	if err := t.updateTimingRecords(curr, trackName, stage.Name); err != nil {
 		ch <- TimingResult{err: err}
 		return
 	}
@@ -103,9 +107,9 @@ func (t *TimingTable) processRecords(stage models.Stage, ch chan<- TimingResult)
 	}
 }
 
-func (t *TimingTable) prevTimingRecords(stage string) ([]models.Record, error) {
+func (t *TimingTable) prevTimingRecords(trackName, stage string) ([]models.Record, error) {
 	var records []models.Record
-	r, err := t.Store.Get(t.stageKey(stage))
+	r, err := t.Store.Get(t.stageKey(trackName, stage))
 	if err != nil {
 		return records, err
 	}
@@ -115,14 +119,14 @@ func (t *TimingTable) prevTimingRecords(stage string) ([]models.Record, error) {
 	return records, nil
 }
 
-func (t *TimingTable) updateTimingRecords(records []models.Record, stage string) error {
+func (t *TimingTable) updateTimingRecords(records []models.Record, trackName, stage string) error {
 	jsonRecords, err := json.Marshal(records)
 	if err != nil {
 		return fmt.Errorf("error while marshaling json: %v", err)
 	}
 	err = t.Store.Put(store.Record{
 		Timestamp: uint32(time.Now().Unix()),
-		Key:       []byte(t.stageKey(stage)),
+		Key:       []byte(t.stageKey(trackName, stage)),
 		Value:     jsonRecords,
 	})
 	if err != nil {
