@@ -2,6 +2,8 @@
 
 ## Overview
 
+![sweats getting their monthly record](static/overview.png)
+
 Send discord webhook whenever someone validated new record for a map on
 Touge Union's KBT Asetto Corsa servers.
 
