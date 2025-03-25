@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	ALL_TIME_STR   = "%s is the new fastest time in %s by %s\n"
-	CURR_MONTH_STR = "%s is the new fastest time this month in %s by %s\n"
+	ALL_TIME_STR   = "New all-time fastest lap! %s in %s by %s\n"
+	CURR_MONTH_STR = "New fastest lap this month! %s in %s by %s\n"
 )
 
 var (
@@ -185,7 +185,7 @@ func compare(region string, prev, curr []models.Record, currMonth bool) (string,
 
 		// handle current month winner if there is no prev record
 		if prevFirst == nil && currMonth {
-			return fmt.Sprintf(CURR_MONTH_STR, currFirst.Player, region, currFirst.Time), nil
+			return fmt.Sprintf(CURR_MONTH_STR, currFirst.Time, region, currFirst.Player), nil
 		}
 	} else {
 		return "", fmt.Errorf("Nothing to compare in %s leaderboard", region)
@@ -196,7 +196,7 @@ func compare(region string, prev, curr []models.Record, currMonth bool) (string,
 		if currMonth {
 			msg = CURR_MONTH_STR
 		}
-		return fmt.Sprintf(msg, currFirst.Player, region, currFirst.Time), nil
+		return fmt.Sprintf(msg, currFirst.Time, region, currFirst.Player), nil
 	}
 
 	return "", nil
