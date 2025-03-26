@@ -33,7 +33,7 @@ func (t *TimingTable) stageKey(trackName, stage string) string {
 		year, month, _ := time.Now().Date()
 		return fmt.Sprintf("%d-%d_%s-%s", year, month, trackName, stage)
 	} else {
-		return stage
+		return fmt.Sprintf("%s-%s", trackName, stage)
 	}
 }
 
